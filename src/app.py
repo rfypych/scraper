@@ -91,7 +91,7 @@ class SocialScraperApp(tk.Tk):
 
         control_frame = ttk.Frame(self.main_frame)
         control_frame.pack(fill=tk.X, padx=5, pady=10)
-        control_frame.column_configure((0, 1, 2), weight=1)
+        control_frame.columnconfigure((0, 1, 2), weight=1)
 
         self.start_button = ttk.Button(control_frame, text="Mulai Scraping", command=self.start_scraping_thread)
         self.start_button.grid(row=0, column=0, padx=5, sticky=tk.EW)
