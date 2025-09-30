@@ -4,13 +4,18 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import logging
 import os
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# --- Define project root and output directory using absolute paths ---
+# This makes the script runnable from any directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+
 # Ensure the output directory exists
-output_dir = "output"
-os.makedirs(output_dir, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def create_sentiment_pie_chart(df, filename="sentiment_pie_chart.png"):
     """
@@ -36,12 +41,12 @@ def create_sentiment_pie_chart(df, filename="sentiment_pie_chart.png"):
     plt.title('Sentiment Distribution')
     plt.ylabel('') # Hides the 'sentiment' label on the y-axis
 
-    save_path = os.path.join(output_dir, filename)
+    save_path = OUTPUT_DIR / filename
     plt.savefig(save_path)
-    plt.close() # Close the figure to free up memory
+    plt.close()
 
     logging.info(f"Sentiment pie chart saved to {save_path}")
-    return save_path
+    return str(save_path)
 
 def create_word_cloud(df, text_column='cleaned_text', filename="word_cloud.png"):
     """
@@ -73,12 +78,12 @@ def create_word_cloud(df, text_column='cleaned_text', filename="word_cloud.png")
     plt.axis("off")
     plt.title("Most Frequent Words")
 
-    save_path = os.path.join(output_dir, filename)
+    save_path = OUTPUT_DIR / filename
     plt.savefig(save_path)
     plt.close()
 
     logging.info(f"Word cloud saved to {save_path}")
-    return save_path
+    return str(save_path)
 
 def draw_sna_graph(G, filename="sna_graph.png"):
     """
@@ -98,33 +103,28 @@ def draw_sna_graph(G, filename="sna_graph.png"):
     logging.info("Drawing SNA graph...")
     plt.figure(figsize=(12, 12))
 
-    # Use a layout that spreads nodes out
     pos = nx.spring_layout(G, k=0.15, iterations=20)
 
-    # Draw the graph
     nx.draw(G, pos, with_labels=True, node_size=50, font_size=8, width=0.5, edge_color='grey')
 
     plt.title("Social Network Analysis - User Mentions")
 
-    save_path = os.path.join(output_dir, filename)
+    save_path = OUTPUT_DIR / filename
     plt.savefig(save_path)
     plt.close()
 
     logging.info(f"SNA graph saved to {save_path}")
-    return save_path
+    return str(save_path)
 
 if __name__ == '__main__':
-    # Example usage for testing
     print("Creating dummy data and graph to test the visualization module...")
 
-    # Dummy data for pie chart and word cloud
     dummy_data = {
         'sentiment': ['positive', 'negative', 'positive', 'neutral', 'positive'],
         'cleaned_text': ['python is great', 'i hate bugs', 'learning python is fun', 'just a tweet', 'great community']
     }
     dummy_df = pd.DataFrame(dummy_data)
 
-    # Dummy graph for SNA
     dummy_graph = nx.Graph()
     dummy_graph.add_edges_from([('a', 'b'), ('a', 'c'), ('b', 'c'), ('c', 'd')])
 

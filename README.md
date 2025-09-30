@@ -66,10 +66,9 @@ playwright install-deps
 ## ▶️ How to Use
 
 1.  **Run the Application**
-    Navigate to the `src` directory and run `app.py`:
+    From the project's root directory, run the following command:
     ```bash
-    cd src
-    python app.py
+    python src/app.py
     ```
 
 2.  **Enter Parameters**

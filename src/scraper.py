@@ -4,30 +4,27 @@ import pandas as pd
 import logging
 import re
 import os
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# --- Define project root and output directory using absolute paths ---
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+
+# Ensure the output directory exists
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 async def scrape_x(keyword, start_date, end_date, username, password, max_tweets=100, stop_event=None):
     """
     Main function to scrape data from X (Twitter) using Playwright.
-
-    Args:
-        keyword (str): The search term to look for.
-        start_date (str): The start date for the search (YYYY-MM-DD).
-        end_date (str): The end date for the search (YYYY-MM-DD).
-        username (str): The X/Twitter username for login.
-        password (str): The X/Twitter password for login.
-        max_tweets (int): The maximum number of tweets to scrape.
-        stop_event (threading.Event, optional): An event to signal stopping the process.
-
-    Returns:
-        pd.DataFrame: A pandas DataFrame containing the scraped data.
+    ...
     """
     logging.info("Starting X/Twitter scraping process.")
 
     scraped_data = []
-    tweet_ids = set()  # To avoid duplicates
+    tweet_ids = set()
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -40,12 +37,19 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
             await page.goto("https://twitter.com/login")
 
             logging.info(f"Logging in as {username}...")
-            # Using more resilient selectors for login
-            await page.get_by_label("Phone, email, or username").fill(username)
-            await page.get_by_role("button", name="Next").click()
+            username_input = page.locator('input[autocomplete="username"]')
+            await username_input.wait_for(timeout=30000)
+            await username_input.fill(username)
 
-            await page.get_by_label("Password").fill(password)
-            await page.get_by_role("button", name="Log in").click()
+            next_button = page.get_by_role("button", name="Next")
+            await next_button.click()
+
+            password_input = page.locator('input[name="password"]')
+            await password_input.wait_for(timeout=30000)
+            await password_input.fill(password)
+
+            login_button = page.get_by_role("button", name="Log in")
+            await login_button.click()
 
             await page.wait_for_url("https://twitter.com/home", timeout=60000)
             logging.info("Login successful.")
@@ -72,17 +76,14 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
 
                 for tweet in tweets:
                     status_url_element = await tweet.query_selector('a[href*="/status/"]')
-                    if not status_url_element:
-                        continue
+                    if not status_url_element: continue
 
                     status_url = await status_url_element.get_attribute('href')
                     tweet_id_match = re.search(r'/status/(\d+)', status_url)
-                    if not tweet_id_match:
-                        continue
+                    if not tweet_id_match: continue
 
                     tweet_id = tweet_id_match.group(1)
-                    if tweet_id in tweet_ids:
-                        continue
+                    if tweet_id in tweet_ids: continue
 
                     try:
                         user_info_element = await tweet.query_selector('div[data-testid="User-Name"]')
@@ -95,7 +96,6 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
                         timestamp_element = await tweet.query_selector('time')
                         timestamp = await timestamp_element.get_attribute('datetime') if timestamp_element else ""
 
-                        # Interaction counts are inside an aria-label
                         reply_count_element = await tweet.query_selector('button[data-testid="reply"]')
                         reply_label = await reply_count_element.get_attribute('aria-label') if reply_count_element else "0"
 
@@ -105,31 +105,23 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
                         like_count_element = await tweet.query_selector('button[data-testid="like"]')
                         like_label = await like_count_element.get_attribute('aria-label') if like_count_element else "0"
 
-                        # Extract numbers from labels
                         like_count = re.search(r'(\d+)', like_label).group(1) if re.search(r'(\d+)', like_label) else "0"
                         retweet_count = re.search(r'(\d+)', retweet_label).group(1) if re.search(r'(\d+)', retweet_label) else "0"
                         reply_count = re.search(r'(\d+)', reply_label).group(1) if re.search(r'(\d+)', reply_label) else "0"
 
                         scraped_data.append({
-                            'Tweet ID': tweet_id,
-                            'Teks Tweet': tweet_text,
-                            'Waktu Posting': timestamp,
-                            'Username': user_handle,
-                            'User ID': user_handle.replace('@', ''),
-                            'Jumlah Like': int(like_count),
-                            'Jumlah Balasan': int(reply_count),
-                            'Jumlah Retweet': int(retweet_count),
-                            'URL Tweet': f"https://twitter.com{status_url}"
+                            'Tweet ID': tweet_id, 'Teks Tweet': tweet_text, 'Waktu Posting': timestamp,
+                            'Username': user_handle, 'User ID': user_handle.replace('@', ''),
+                            'Jumlah Like': int(like_count), 'Jumlah Balasan': int(reply_count),
+                            'Jumlah Retweet': int(retweet_count), 'URL Tweet': f"https://twitter.com{status_url}"
                         })
                         tweet_ids.add(tweet_id)
 
-                        if len(scraped_data) >= max_tweets:
-                            break
+                        if len(scraped_data) >= max_tweets: break
                     except Exception as e:
                         logging.warning(f"Could not parse a tweet, skipping. Error: {e}")
 
-                if len(scraped_data) >= max_tweets:
-                    break
+                if len(scraped_data) >= max_tweets: break
 
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                 await asyncio.sleep(2)
@@ -144,9 +136,9 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
 
         except Exception as e:
             logging.error(f"An error occurred during scraping: {e}")
-            os.makedirs("output", exist_ok=True)
-            await page.screenshot(path="output/error_screenshot.png")
-            logging.info("An error screenshot has been saved as 'output/error_screenshot.png'.")
+            screenshot_path = OUTPUT_DIR / "error_screenshot.png"
+            await page.screenshot(path=screenshot_path)
+            logging.info(f"An error screenshot has been saved as '{screenshot_path}'.")
 
         finally:
             await browser.close()
@@ -160,8 +152,6 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
 
 if __name__ == '__main__':
     async def main():
-        # This is a dummy example and will not run without a real login.
-        # It demonstrates how the function would be called.
         DUMMY_USER = os.environ.get("X_USERNAME", "your_username")
         DUMMY_PASS = os.environ.get("X_PASSWORD", "your_password")
 
@@ -169,22 +159,17 @@ if __name__ == '__main__':
             print("Please set X_USERNAME and X_PASSWORD environment variables to test.")
             return
 
-        stop_event = asyncio.Event()
         df = await scrape_x(
-            keyword="indonesia",
-            start_date="2024-05-01",
-            end_date="2024-05-02",
-            username=DUMMY_USER,
-            password=DUMMY_PASS,
-            max_tweets=20,
-            stop_event=stop_event
+            keyword="indonesia", start_date="2024-05-01", end_date="2024-05-02",
+            username=DUMMY_USER, password=DUMMY_PASS, max_tweets=20
         )
 
         if not df.empty:
             print("Scraping successful. Data head:")
             print(df.head())
-            df.to_csv("output/scraped_tweets.csv", index=False)
-            print("Data saved to output/scraped_tweets.csv")
+            csv_path = OUTPUT_DIR / "scraped_tweets.csv"
+            df.to_csv(csv_path, index=False)
+            print(f"Data saved to {csv_path}")
         else:
             print("Scraping finished with no data.")
 

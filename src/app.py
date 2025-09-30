@@ -5,6 +5,14 @@ import asyncio
 from datetime import datetime
 import queue
 import os
+from pathlib import Path
+
+# --- Define project root and output directory using absolute paths ---
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+
+# Ensure the output directory exists
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Import backend modules
 from scraper import scrape_x
@@ -18,8 +26,8 @@ class LoginPopup(Toplevel):
         super().__init__(parent)
         self.title("Login X/Twitter")
         self.geometry("350x150")
-        self.transient(parent) # Keep on top of the main window
-        self.grab_set() # Modal
+        self.transient(parent)
+        self.grab_set()
 
         self.username = None
         self.password = None
@@ -108,21 +116,18 @@ class SocialScraperApp(tk.Tk):
         self.log_area = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, state=tk.DISABLED)
         self.log_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- State Variables & Threading ---
         self.scraping_thread = None
         self.stop_event = threading.Event()
         self.log_queue = queue.Queue()
         self.final_df = None
         self.output_files = {}
 
-        # Start checking the log queue
         self.after(100, self.process_log_queue)
 
     def log_message(self, message):
         self.log_queue.put(message)
 
     def process_log_queue(self):
-        """Processes messages from the log queue to update the GUI."""
         while not self.log_queue.empty():
             try:
                 message = self.log_queue.get_nowait()
@@ -156,42 +161,34 @@ class SocialScraperApp(tk.Tk):
         self.scraping_thread.start()
 
     def run_scraping_pipeline(self, keyword, start_date, end_date, username, password):
-        """The main pipeline executed in a separate thread."""
         try:
-            # This is a bridge between synchronous (threading) and asynchronous (asyncio) code
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-            # --- 1. Initialize models ---
             self.log_message("Menginisialisasi model analisis sentimen...")
             initialize_sentiment_model()
 
-            # --- 2. Scrape Data ---
             self.log_message("Memulai proses scraping dari X/Twitter...")
-            # Note: We'll need to modify scrape_x to accept the stop_event
             raw_df = loop.run_until_complete(scrape_x(keyword, start_date, end_date, username, password, stop_event=self.stop_event))
 
             if self.stop_event.is_set() or raw_df is None or raw_df.empty:
                 self.log_message("Proses dihentikan atau tidak ada data yang ditemukan.")
                 return
 
-            # --- 3. Process Data ---
             self.log_message(f"Ditemukan {len(raw_df)} tweet. Memulai pembersihan data...")
             processed_df = process_data(raw_df)
             if processed_df.empty:
                 self.log_message("Tidak ada data tersisa setelah pembersihan.")
                 return
 
-            # --- 4. Analyze Data ---
             self.log_message("Melakukan analisis sentimen...")
             sentiment_df = analyze_sentiment(processed_df, text_column='cleaned_text')
 
             self.log_message("Membuat graf Social Network Analysis (SNA)...")
             sna_graph = create_sna_graph(sentiment_df)
 
-            self.final_df = sentiment_df # Store for export
+            self.final_df = sentiment_df
 
-            # --- 5. Visualize Data ---
             self.log_message("Membuat visualisasi hasil analisis...")
             self.output_files['pie_chart'] = create_sentiment_pie_chart(sentiment_df)
             self.output_files['word_cloud'] = create_word_cloud(sentiment_df)
@@ -215,7 +212,7 @@ class SocialScraperApp(tk.Tk):
     def export_results(self):
         if self.final_df is not None and not self.final_df.empty:
             try:
-                csv_path = os.path.join("output", "scraped_data_analyzed.csv")
+                csv_path = OUTPUT_DIR / "scraped_data_analyzed.csv"
                 self.final_df.to_csv(csv_path, index=False)
 
                 report_message = "Hasil telah berhasil diekspor ke direktori 'output':\n"
@@ -251,5 +248,5 @@ class SocialScraperApp(tk.Tk):
 
 if __name__ == "__main__":
     app = SocialScraperApp()
-    app.log_message("Aplikasi siap. Masukkan parameter dan klik 'Mulai Scraping'.")
+    app.log_message("Aplikasi siap. Jalankan dari direktori root proyek (python src/app.py).")
     app.mainloop()
