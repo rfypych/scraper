@@ -37,7 +37,7 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
             await page.goto("https://twitter.com/login")
 
             logging.info(f"Logging in as {username}...")
-            username_input = page.locator('input[autocomplete="username"]')
+            username_input = page.locator('input[name="text"]')
             await username_input.wait_for(timeout=30000)
             await username_input.fill(username)
 
