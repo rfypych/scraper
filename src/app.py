@@ -26,7 +26,7 @@ class LoginPopup(Toplevel):
 
         main_frame = ttk.Frame(self, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        main_frame.column_configure(1, weight=1)
+        main_frame.columnconfigure(1, weight=1)
 
         ttk.Label(main_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.username_entry = ttk.Entry(main_frame)
