@@ -1,0 +1,9 @@
+playwright
+pandas
+transformers
+torch
+sastrawi
+networkx
+matplotlib
+wordcloud
+scikit-learn
