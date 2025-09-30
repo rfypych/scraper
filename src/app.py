@@ -73,7 +73,7 @@ class SocialScraperApp(tk.Tk):
 
         input_frame = ttk.LabelFrame(self.main_frame, text="Parameter Input")
         input_frame.pack(fill=tk.X, padx=5, pady=5)
-        input_frame.column_configure(1, weight=1)
+        input_frame.columnconfigure(1, weight=1)
 
         ttk.Label(input_frame, text="Kata Kunci:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.keyword_entry = ttk.Entry(input_frame)
