@@ -14,48 +14,41 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 # Ensure the output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Import backend modules
+# --- Import backend modules ---
 from scraper import scrape_x
+from reddit_scraper import scrape_reddit
 from processor import process_data
 from analyzer import initialize_sentiment_model, analyze_sentiment, create_sna_graph
-from visualizer import create_sentiment_pie_chart, create_word_cloud, draw_sna_graph
+from visualizer import create_sentiment_pie_chart, create_word_cloud, draw_sna_graph, create_interactive_sna_graph
 
 class LoginPopup(Toplevel):
-    """A Toplevel window for the user to input their login credentials."""
+    # ... (LoginPopup class remains unchanged)
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Login X/Twitter")
         self.geometry("350x150")
         self.transient(parent)
         self.grab_set()
-
         self.username = None
         self.password = None
-
         main_frame = ttk.Frame(self, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         main_frame.columnconfigure(1, weight=1)
-
         ttk.Label(main_frame, text="Username:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.username_entry = ttk.Entry(main_frame)
         self.username_entry.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
         self.username_entry.focus_set()
-
         ttk.Label(main_frame, text="Password:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
         self.password_entry = ttk.Entry(main_frame, show="*")
         self.password_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
-
         button_frame = ttk.Frame(main_frame)
         button_frame.grid(row=2, column=0, columnspan=2, pady=10)
-
         ok_button = ttk.Button(button_frame, text="Login", command=self.on_ok)
         ok_button.pack(side=tk.LEFT, padx=5)
         cancel_button = ttk.Button(button_frame, text="Batal", command=self.on_cancel)
         cancel_button.pack(side=tk.LEFT, padx=5)
-
         self.protocol("WM_DELETE_WINDOW", self.on_cancel)
         self.wait_window(self)
-
     def on_ok(self, event=None):
         self.username = self.username_entry.get().strip()
         self.password = self.password_entry.get().strip()
@@ -63,7 +56,6 @@ class LoginPopup(Toplevel):
             messagebox.showwarning("Input Kosong", "Username dan password tidak boleh kosong.", parent=self)
             return
         self.destroy()
-
     def on_cancel(self):
         self.username = None
         self.password = None
@@ -72,57 +64,75 @@ class LoginPopup(Toplevel):
 class SocialScraperApp(tk.Tk):
     def __init__(self):
         super().__init__()
-
         self.title("Social Media Scraper & Analyzer")
-        self.geometry("700x600")
-
+        self.geometry("700x650")
         self.main_frame = ttk.Frame(self, padding="10")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
-
-        input_frame = ttk.LabelFrame(self.main_frame, text="Parameter Input")
-        input_frame.pack(fill=tk.X, padx=5, pady=5)
-        input_frame.columnconfigure(1, weight=1)
-
-        ttk.Label(input_frame, text="Kata Kunci:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
-        self.keyword_entry = ttk.Entry(input_frame)
-        self.keyword_entry.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
-
-        ttk.Label(input_frame, text="Tanggal Mulai (YYYY-MM-DD):").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
-        self.start_date_entry = ttk.Entry(input_frame)
-        self.start_date_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
-        self.start_date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
-
-        ttk.Label(input_frame, text="Tanggal Selesai (YYYY-MM-DD):").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
-        self.end_date_entry = ttk.Entry(input_frame)
-        self.end_date_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.EW)
-        self.end_date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
-
+        platform_frame = ttk.LabelFrame(self.main_frame, text="Pilih Platform")
+        platform_frame.pack(fill=tk.X, padx=5, pady=5)
+        platform_frame.columnconfigure(1, weight=1)
+        ttk.Label(platform_frame, text="Platform:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        self.platform_var = tk.StringVar(value="Twitter")
+        self.platform_menu = ttk.Combobox(platform_frame, textvariable=self.platform_var, values=["Twitter", "Reddit"], state="readonly")
+        self.platform_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
+        self.platform_menu.bind("<<ComboboxSelected>>", self.update_ui_for_platform)
+        self.input_frame = ttk.LabelFrame(self.main_frame, text="Parameter Input")
+        self.input_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.input_frame.columnconfigure(1, weight=1)
+        self.target_label = ttk.Label(self.input_frame, text="Kata Kunci:")
+        self.target_label.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.target_entry = ttk.Entry(self.input_frame)
+        self.target_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.EW)
+        self.start_date_label = ttk.Label(self.input_frame, text="Tanggal Mulai (YYYY-MM-DD):")
+        self.start_date_label.grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+        self.start_date_entry = ttk.Entry(self.input_frame)
+        self.start_date_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.EW)
+        self.end_date_label = ttk.Label(self.input_frame, text="Tanggal Selesai (YYYY-MM-DD):")
+        self.end_date_label.grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
+        self.end_date_entry = ttk.Entry(self.input_frame)
+        self.end_date_entry.grid(row=3, column=1, padx=5, pady=5, sticky=tk.EW)
+        self.reddit_target_type_label = ttk.Label(self.input_frame, text="Tipe Target:")
+        self.reddit_target_type_var = tk.StringVar(value="Subreddit")
+        self.reddit_target_type_menu = ttk.Combobox(self.input_frame, textvariable=self.reddit_target_type_var, values=["Subreddit", "Kata Kunci Pencarian"], state="readonly")
         control_frame = ttk.Frame(self.main_frame)
         control_frame.pack(fill=tk.X, padx=5, pady=10)
         control_frame.columnconfigure((0, 1, 2), weight=1)
-
         self.start_button = ttk.Button(control_frame, text="Mulai Scraping", command=self.start_scraping_thread)
         self.start_button.grid(row=0, column=0, padx=5, sticky=tk.EW)
-
         self.stop_button = ttk.Button(control_frame, text="Berhenti", state=tk.DISABLED, command=self.stop_scraping)
         self.stop_button.grid(row=0, column=1, padx=5, sticky=tk.EW)
-
         self.export_button = ttk.Button(control_frame, text="Ekspor Hasil", state=tk.DISABLED, command=self.export_results)
         self.export_button.grid(row=0, column=2, padx=5, sticky=tk.EW)
-
         log_frame = ttk.LabelFrame(self.main_frame, text="Log Status")
         log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
         self.log_area = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, state=tk.DISABLED)
         self.log_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
         self.scraping_thread = None
         self.stop_event = threading.Event()
         self.log_queue = queue.Queue()
         self.final_df = None
         self.output_files = {}
-
         self.after(100, self.process_log_queue)
+        self.update_ui_for_platform()
+
+    def update_ui_for_platform(self, event=None):
+        platform = self.platform_var.get()
+        self.reddit_target_type_label.grid_remove()
+        self.reddit_target_type_menu.grid_remove()
+        if platform == "Twitter":
+            self.target_label.config(text="Kata Kunci (dipisah koma):")
+            self.start_date_label.grid()
+            self.start_date_entry.grid()
+            self.end_date_label.grid()
+            self.end_date_entry.grid()
+        elif platform == "Reddit":
+            self.reddit_target_type_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+            self.reddit_target_type_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.EW)
+            self.target_label.config(text="Subreddit / Kata Kunci:")
+            self.start_date_label.grid_remove()
+            self.start_date_entry.grid_remove()
+            self.end_date_label.grid_remove()
+            self.end_date_entry.grid_remove()
 
     def log_message(self, message):
         self.log_queue.put(message)
@@ -141,42 +151,43 @@ class SocialScraperApp(tk.Tk):
         self.after(100, self.process_log_queue)
 
     def start_scraping_thread(self):
-        keyword_input = self.keyword_entry.get().strip()
-        if not keyword_input:
-            messagebox.showwarning("Input Diperlukan", "Kata kunci tidak boleh kosong.")
-            return
+        platform = self.platform_var.get()
+        target_input = self.target_entry.get().strip()
 
-        # --- Multi-Keyword Logic ---
-        keywords = [k.strip() for k in keyword_input.split(',')]
-        keywords = [k for k in keywords if k]  # Remove empty strings
-
-        if not keywords:
-            messagebox.showwarning("Input Diperlukan", "Format kata kunci salah.")
-            return
-
-        if len(keywords) == 1:
-            formatted_keyword = keywords[0]
-        else:
-            # Format for X/Twitter search: (word1 OR word2 OR word3)
-            formatted_keyword = f"({' OR '.join(keywords)})"
-
-        self.log_message(f"Keywords processed. Search query will be: {formatted_keyword}")
-
-        login_popup = LoginPopup(self)
-        username, password = login_popup.username, login_popup.password
-
-        if not username or not password:
-            self.log_message("Proses login dibatalkan.")
+        if not target_input:
+            messagebox.showwarning("Input Diperlukan", "Input target tidak boleh kosong.")
             return
 
         self.update_ui_for_scraping_start()
-        self.scraping_thread = threading.Thread(
-            target=self.run_scraping_pipeline,
-            args=(formatted_keyword, self.start_date_entry.get(), self.end_date_entry.get(), username, password)
-        )
+
+        if platform == "Twitter":
+            keywords = [k.strip() for k in target_input.split(',')]
+            keywords = [k for k in keywords if k]
+            if not keywords:
+                messagebox.showwarning("Input Diperlukan", "Format kata kunci salah.")
+                self.update_ui_for_scraping_end()
+                return
+            formatted_keyword = f"({' OR '.join(keywords)})" if len(keywords) > 1 else keywords[0]
+            self.log_message(f"Keywords processed. Search query will be: {formatted_keyword}")
+
+            login_popup = LoginPopup(self)
+            username, password = login_popup.username, login_popup.password
+            if not username or not password:
+                self.log_message("Proses login dibatalkan.")
+                self.update_ui_for_scraping_end()
+                return
+
+            args = (platform, formatted_keyword, self.start_date_entry.get(), self.end_date_entry.get(), username, password)
+
+        elif platform == "Reddit":
+            reddit_target_type = self.reddit_target_type_var.get()
+            self.log_message(f"Targeting Reddit {reddit_target_type}: {target_input}")
+            args = (platform, target_input, reddit_target_type)
+
+        self.scraping_thread = threading.Thread(target=self.run_scraping_pipeline, args=args)
         self.scraping_thread.start()
 
-    def run_scraping_pipeline(self, keyword, start_date, end_date, username, password):
+    def run_scraping_pipeline(self, platform, *args):
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -184,14 +195,22 @@ class SocialScraperApp(tk.Tk):
             self.log_message("Menginisialisasi model analisis sentimen...")
             initialize_sentiment_model()
 
-            self.log_message("Memulai proses scraping dari X/Twitter...")
-            raw_df = loop.run_until_complete(scrape_x(keyword, start_date, end_date, username, password, stop_event=self.stop_event))
+            raw_df = None
+            if platform == "Twitter":
+                keyword, start_date, end_date, username, password = args
+                self.log_message(f"Memulai proses scraping dari {platform}...")
+                raw_df = loop.run_until_complete(scrape_x(keyword, start_date, end_date, username, password, stop_event=self.stop_event))
+            elif platform == "Reddit":
+                target, target_type = args
+                self.log_message(f"Memulai proses scraping dari {platform}...")
+                raw_df = loop.run_until_complete(scrape_reddit(target, target_type, stop_event=self.stop_event))
 
             if self.stop_event.is_set() or raw_df is None or raw_df.empty:
                 self.log_message("Proses dihentikan atau tidak ada data yang ditemukan.")
                 return
 
-            self.log_message(f"Ditemukan {len(raw_df)} tweet. Memulai pembersihan data...")
+            self.log_message(f"Ditemukan {len(raw_df)} item. Memulai pembersihan data...")
+            # We need to make processor and analyzer more generic
             processed_df = process_data(raw_df)
             if processed_df.empty:
                 self.log_message("Tidak ada data tersisa setelah pembersihan.")
@@ -208,7 +227,8 @@ class SocialScraperApp(tk.Tk):
             self.log_message("Membuat visualisasi hasil analisis...")
             self.output_files['pie_chart'] = create_sentiment_pie_chart(sentiment_df)
             self.output_files['word_cloud'] = create_word_cloud(sentiment_df)
-            self.output_files['sna_graph'] = draw_sna_graph(sna_graph)
+            # Use interactive graph for SNA
+            self.output_files['sna_graph'] = create_interactive_sna_graph(sna_graph, filename="interactive_sna.html")
 
             self.log_message("Semua proses telah selesai!")
             self.log_message("Anda sekarang dapat mengekspor hasilnya.")
@@ -230,16 +250,14 @@ class SocialScraperApp(tk.Tk):
             try:
                 csv_path = OUTPUT_DIR / "scraped_data_analyzed.csv"
                 self.final_df.to_csv(csv_path, index=False)
-
                 report_message = "Hasil telah berhasil diekspor ke direktori 'output':\n"
-                report_message += f"\n- Data CSV: {os.path.basename(csv_path)}"
+                report_message += f"\n- Data CSV: {os.path.basename(str(csv_path))}"
                 if self.output_files.get('pie_chart'):
                     report_message += f"\n- Grafik Sentimen: {os.path.basename(self.output_files['pie_chart'])}"
                 if self.output_files.get('word_cloud'):
                     report_message += f"\n- Word Cloud: {os.path.basename(self.output_files['word_cloud'])}"
                 if self.output_files.get('sna_graph'):
-                    report_message += f"\n- Grafik SNA: {os.path.basename(self.output_files['sna_graph'])}"
-
+                    report_message += f"\n- Grafik SNA Interaktif (HTML): {os.path.basename(self.output_files['sna_graph'])}"
                 messagebox.showinfo("Ekspor Berhasil", report_message)
             except Exception as e:
                 messagebox.showerror("Error Ekspor", f"Gagal menyimpan file: {e}")
@@ -264,5 +282,5 @@ class SocialScraperApp(tk.Tk):
 
 if __name__ == "__main__":
     app = SocialScraperApp()
-    app.log_message("Aplikasi siap. Jalankan dari direktori root proyek (python src/app.py).")
+    app.log_message("Aplikasi siap. Pilih platform dan masukkan parameter.")
     app.mainloop()

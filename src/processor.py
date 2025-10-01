@@ -13,11 +13,10 @@ try:
 except ImportError:
     SASTRAWI_AVAILABLE = False
     logging.warning("Sastrawi library not found. Stemming will be skipped.")
-    logging.warning("To enable stemming, please ensure Sastrawi is installed correctly (`pip install Sastrawi`).")
 
-def clean_tweet_text(text):
+def clean_text(text):
     """
-    Cleans a single tweet text.
+    Cleans a single text entry.
     - Removes URLs
     - Removes HTML tags
     - Removes mentions (@username)
@@ -25,30 +24,25 @@ def clean_tweet_text(text):
     - Removes special characters and numbers
     - Converts to lowercase
     """
-    text = re.sub(r'http\S+', '', text)  # Remove URLs
-    text = re.sub(r'<.*?>', '', text)  # Remove HTML tags
-    text = re.sub(r'@\w+', '', text)  # Remove mentions
-    text = text.replace('#', '')  # Remove hashtag symbol
-    text = re.sub(r'[^a-zA-Z\s]', '', text)  # Remove special characters and numbers
-    text = text.lower()  # Convert to lowercase
-    text = text.strip()  # Remove leading/trailing whitespace
+    if not isinstance(text, str):
+        return ""
+    text = re.sub(r'http\S+', '', text)
+    text = re.sub(r'<.*?>', '', text)
+    text = re.sub(r'@\w+', '', text)
+    text = text.replace('#', '')
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    text = text.lower()
+    text = text.strip()
     return text
 
 def stem_text(text, stemmer):
-    """
-    Applies stemming to the text using the Sastrawi stemmer.
-    """
+    """Applies stemming to the text using the Sastrawi stemmer."""
     return stemmer.stem(text)
 
 def process_data(df):
     """
-    Processes the raw scraped data.
-
-    Args:
-        df (pd.DataFrame): The DataFrame containing raw tweet data.
-
-    Returns:
-        pd.DataFrame: The processed and cleaned DataFrame.
+    Processes the raw scraped data from any platform.
+    It identifies the correct text column ('Teks Tweet' or 'Text') and processes it.
     """
     if df.empty:
         logging.warning("Input DataFrame is empty. Skipping processing.")
@@ -56,29 +50,37 @@ def process_data(df):
 
     logging.info("Starting data processing...")
 
-    # 1. Clean the tweet text
-    logging.info("Cleaning tweet text...")
-    df['cleaned_text'] = df['Teks Tweet'].apply(clean_tweet_text)
+    # --- Identify the source text column ---
+    if 'Teks Tweet' in df.columns:
+        source_text_col = 'Teks Tweet'
+    elif 'Text' in df.columns:
+        source_text_col = 'Text'
+    else:
+        logging.error("No recognizable text column ('Teks Tweet' or 'Text') found in DataFrame.")
+        return df # Return original df if no text column
 
-    # 2. Stemming (only if Sastrawi is available)
+    logging.info(f"Identified '{source_text_col}' as the source text column.")
+
+    # 1. Clean the text
+    logging.info("Cleaning text...")
+    df['cleaned_text'] = df[source_text_col].apply(clean_text)
+
+    # 2. Stemming (optional)
     if SASTRAWI_AVAILABLE:
         logging.info("Initializing Sastrawi stemmer...")
         try:
             factory = StemmerFactory()
             stemmer = factory.create_stemmer()
             logging.info("Applying stemming to text...")
-            # Note: Stemming can be slow on large datasets.
             df['stemmed_text'] = df['cleaned_text'].apply(lambda x: stem_text(x, stemmer))
             logging.info("Stemming complete.")
         except Exception as e:
             logging.error(f"An error occurred during stemming with Sastrawi: {e}")
-            logging.warning("Skipping the stemming process due to an error.")
-            df['stemmed_text'] = df['cleaned_text'] # Fallback
+            df['stemmed_text'] = df['cleaned_text']
     else:
-        # If the library is not available, just copy the cleaned text.
         df['stemmed_text'] = df['cleaned_text']
 
-    # Remove rows where cleaned_text is empty after processing
+    # Remove rows where cleaned_text is empty
     df.dropna(subset=['cleaned_text'], inplace=True)
     df = df[df['cleaned_text'] != '']
 
@@ -87,24 +89,5 @@ def process_data(df):
     return df
 
 if __name__ == '__main__':
-    # Example usage for testing
-    print("Creating a dummy DataFrame to test the processing module...")
-
-    dummy_data = {
-        'Tweet ID': ['1', '2', '3'],
-        'Teks Tweet': [
-            'Wow, #Python itu keren banget! Cek link ini: https://python.org @guido',
-            'Belajar data science dengan pandas itu menyenangkan. <html><body><p>Tag</p></body></html>',
-            'Analisis sentimen menggunakan AI 123.'
-        ]
-    }
-    dummy_df = pd.DataFrame(dummy_data)
-
-    print("\nOriginal DataFrame:")
-    print(dummy_df)
-
-    processed_df = process_data(dummy_df.copy())
-
-    print("\nProcessed DataFrame:")
-    print(processed_df)
-    print("\nNote: 'stemmed_text' will be the same as 'cleaned_text' if Sastrawi is not found.")
+    # ... (Test cases can be updated to reflect this new generic approach)
+    print("Processor module is now generic.")

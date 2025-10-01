@@ -5,12 +5,12 @@ from wordcloud import WordCloud
 import logging
 import os
 from pathlib import Path
+from pyvis.network import Network
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- Define project root and output directory using absolute paths ---
-# This makes the script runnable from any directory
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
@@ -18,16 +18,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def create_sentiment_pie_chart(df, filename="sentiment_pie_chart.png"):
-    """
-    Creates and saves a pie chart of the sentiment distribution.
-
-    Args:
-        df (pd.DataFrame): DataFrame with a 'sentiment' column.
-        filename (str): The name of the file to save the chart to.
-
-    Returns:
-        str: The path to the saved image file.
-    """
+    """Creates and saves a pie chart of the sentiment distribution."""
     if df.empty or 'sentiment' not in df:
         logging.warning("DataFrame is empty or missing 'sentiment' column. Skipping pie chart creation.")
         return None
@@ -37,9 +28,9 @@ def create_sentiment_pie_chart(df, filename="sentiment_pie_chart.png"):
 
     plt.figure(figsize=(8, 8))
     plt.pie(sentiment_counts, labels=sentiment_counts.index, autopct='%1.1f%%', startangle=140,
-            colors=['#4CAF50', '#F44336', '#FFC107']) # Green, Red, Amber
+            colors=['#4CAF50', '#FFC107', '#F44336']) # Green, Amber, Red for pos, neu, neg
     plt.title('Sentiment Distribution')
-    plt.ylabel('') # Hides the 'sentiment' label on the y-axis
+    plt.ylabel('')
 
     save_path = OUTPUT_DIR / filename
     plt.savefig(save_path)
@@ -49,17 +40,7 @@ def create_sentiment_pie_chart(df, filename="sentiment_pie_chart.png"):
     return str(save_path)
 
 def create_word_cloud(df, text_column='cleaned_text', filename="word_cloud.png"):
-    """
-    Creates and saves a word cloud from the text data.
-
-    Args:
-        df (pd.DataFrame): DataFrame with a text column.
-        text_column (str): The column to use for the word cloud.
-        filename (str): The name of the file to save the chart to.
-
-    Returns:
-        str: The path to the saved image file.
-    """
+    """Creates and saves a word cloud from the text data."""
     if df.empty or text_column not in df:
         logging.warning(f"DataFrame is empty or missing '{text_column}' column. Skipping word cloud creation.")
         return None
@@ -85,36 +66,57 @@ def create_word_cloud(df, text_column='cleaned_text', filename="word_cloud.png")
     logging.info(f"Word cloud saved to {save_path}")
     return str(save_path)
 
-def draw_sna_graph(G, filename="sna_graph.png"):
+def create_interactive_sna_graph(G, filename="interactive_sna_graph.html"):
     """
-    Draws and saves the Social Network Analysis graph.
+    Creates and saves an interactive Social Network Analysis graph as an HTML file.
 
     Args:
         G (nx.Graph): The NetworkX graph object.
-        filename (str): The name of the file to save the chart to.
+        filename (str): The name of the HTML file to save the chart to.
 
     Returns:
-        str: The path to the saved image file.
+        str: The path to the saved HTML file.
     """
     if not isinstance(G, nx.Graph) or G.number_of_nodes() == 0:
-        logging.warning("Invalid or empty graph provided. Skipping SNA graph drawing.")
+        logging.warning("Invalid or empty graph provided. Skipping interactive SNA graph creation.")
         return None
 
-    logging.info("Drawing SNA graph...")
-    plt.figure(figsize=(12, 12))
+    logging.info("Creating interactive SNA graph with Pyvis...")
 
-    pos = nx.spring_layout(G, k=0.15, iterations=20)
+    net = Network(height="750px", width="100%", bgcolor="#222222", font_color="white", notebook=False)
+    net.from_nx(G)
 
-    nx.draw(G, pos, with_labels=True, node_size=50, font_size=8, width=0.5, edge_color='grey')
-
-    plt.title("Social Network Analysis - User Mentions")
+    # Set physics options for a better layout
+    net.set_options("""
+    var options = {
+      "physics": {
+        "forceAtlas2Based": {
+          "gravitationalConstant": -50,
+          "centralGravity": 0.01,
+          "springLength": 100,
+          "springConstant": 0.08
+        },
+        "minVelocity": 0.75,
+        "solver": "forceAtlas2Based"
+      }
+    }
+    """)
 
     save_path = OUTPUT_DIR / filename
-    plt.savefig(save_path)
-    plt.close()
+    try:
+        net.save_graph(str(save_path))
+        logging.info(f"Interactive SNA graph saved to {save_path}")
+        return str(save_path)
+    except Exception as e:
+        logging.error(f"Failed to save interactive SNA graph: {e}")
+        return None
 
-    logging.info(f"SNA graph saved to {save_path}")
-    return str(save_path)
+# This function is now deprecated in favor of the interactive one but kept for compatibility.
+def draw_sna_graph(G, filename="sna_graph.png"):
+    """Draws and saves a static SNA graph."""
+    logging.warning("`draw_sna_graph` is deprecated. Use `create_interactive_sna_graph` instead.")
+    return create_interactive_sna_graph(G, filename="interactive_sna_graph.html")
+
 
 if __name__ == '__main__':
     print("Creating dummy data and graph to test the visualization module...")
@@ -129,16 +131,10 @@ if __name__ == '__main__':
     dummy_graph.add_edges_from([('a', 'b'), ('a', 'c'), ('b', 'c'), ('c', 'd')])
 
     print("\nTesting Pie Chart Creation...")
-    pie_chart_path = create_sentiment_pie_chart(dummy_df)
-    if pie_chart_path:
-        print(f"Pie chart created at: {pie_chart_path}")
+    create_sentiment_pie_chart(dummy_df)
 
     print("\nTesting Word Cloud Creation...")
-    word_cloud_path = create_word_cloud(dummy_df)
-    if word_cloud_path:
-        print(f"Word cloud created at: {word_cloud_path}")
+    create_word_cloud(dummy_df)
 
-    print("\nTesting SNA Graph Drawing...")
-    sna_graph_path = draw_sna_graph(dummy_graph)
-    if sna_graph_path:
-        print(f"SNA graph created at: {sna_graph_path}")
+    print("\nTesting Interactive SNA Graph Drawing...")
+    create_interactive_sna_graph(dummy_graph)
