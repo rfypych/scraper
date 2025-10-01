@@ -15,24 +15,11 @@ except ImportError:
     logging.warning("Sastrawi library not found. Stemming will be skipped.")
 
 def clean_text(text):
-    """
-    Cleans a single text entry.
-    - Removes URLs
-    - Removes HTML tags
-    - Removes mentions (@username)
-    - Removes hashtags (#) but keeps the text
-    - Removes special characters and numbers
-    - Converts to lowercase
-    """
-    if not isinstance(text, str):
-        return ""
-    text = re.sub(r'http\S+', '', text)
-    text = re.sub(r'<.*?>', '', text)
-    text = re.sub(r'@\w+', '', text)
-    text = text.replace('#', '')
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
-    text = text.lower()
-    text = text.strip()
+    """Cleans a single text entry."""
+    if not isinstance(text, str): return ""
+    text = re.sub(r'http\S+', '', text); text = re.sub(r'<.*?>', '', text)
+    text = re.sub(r'@\w+', '', text); text = text.replace('#', '')
+    text = re.sub(r'[^a-zA-Z\s]', '', text); text = text.lower(); text = text.strip()
     return text
 
 def stem_text(text, stemmer):
@@ -41,8 +28,10 @@ def stem_text(text, stemmer):
 
 def process_data(df):
     """
-    Processes the raw scraped data from any platform.
-    It identifies the correct text column ('Teks Tweet' or 'Text') and processes it.
+    Processes raw scraped data from any platform.
+    - Identifies the correct text columns.
+    - For Google News, it combines Title and Snippet.
+    - Cleans and optionally stems the text.
     """
     if df.empty:
         logging.warning("Input DataFrame is empty. Skipping processing.")
@@ -50,32 +39,35 @@ def process_data(df):
 
     logging.info("Starting data processing...")
 
-    # --- Identify the source text column ---
-    if 'Teks Tweet' in df.columns:
+    # --- Identify and prepare the source text column ---
+    if 'Teks Tweet' in df.columns: # Twitter
         source_text_col = 'Teks Tweet'
-    elif 'Text' in df.columns:
+        df['source_text'] = df[source_text_col]
+    elif 'Text' in df.columns: # Reddit
         source_text_col = 'Text'
+        df['source_text'] = df[source_text_col]
+    elif 'Title' in df.columns and 'Snippet' in df.columns: # Google News
+        source_text_col = 'Google News (Title + Snippet)'
+        df['source_text'] = df['Title'] + ' ' + df['Snippet']
     else:
-        logging.error("No recognizable text column ('Teks Tweet' or 'Text') found in DataFrame.")
-        return df # Return original df if no text column
+        logging.error("No recognizable text columns found in DataFrame.")
+        return pd.DataFrame()
 
-    logging.info(f"Identified '{source_text_col}' as the source text column.")
+    logging.info(f"Using '{source_text_col}' as the source text.")
 
     # 1. Clean the text
     logging.info("Cleaning text...")
-    df['cleaned_text'] = df[source_text_col].apply(clean_text)
+    df['cleaned_text'] = df['source_text'].apply(clean_text)
 
     # 2. Stemming (optional)
     if SASTRAWI_AVAILABLE:
-        logging.info("Initializing Sastrawi stemmer...")
+        logging.info("Initializing and applying Sastrawi stemmer...")
         try:
-            factory = StemmerFactory()
-            stemmer = factory.create_stemmer()
-            logging.info("Applying stemming to text...")
+            factory = StemmerFactory(); stemmer = factory.create_stemmer()
             df['stemmed_text'] = df['cleaned_text'].apply(lambda x: stem_text(x, stemmer))
             logging.info("Stemming complete.")
         except Exception as e:
-            logging.error(f"An error occurred during stemming with Sastrawi: {e}")
+            logging.error(f"An error occurred during stemming: {e}")
             df['stemmed_text'] = df['cleaned_text']
     else:
         df['stemmed_text'] = df['cleaned_text']
@@ -87,7 +79,3 @@ def process_data(df):
     logging.info(f"Data processing complete. Shape of the processed data: {df.shape}")
 
     return df
-
-if __name__ == '__main__':
-    # ... (Test cases can be updated to reflect this new generic approach)
-    print("Processor module is now generic.")
