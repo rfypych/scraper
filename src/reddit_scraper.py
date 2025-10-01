@@ -30,7 +30,7 @@ async def scrape_reddit(target, target_type="subreddit", max_posts=25, stop_even
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
+        context = await browser.new_context(ignore_https_errors=True)
         page = await context.new_page()
 
         try:

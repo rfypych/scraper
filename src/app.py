@@ -181,8 +181,16 @@ class SocialScraperApp(tk.Tk):
 
         elif platform == "Reddit":
             reddit_target_type = self.reddit_target_type_var.get()
-            self.log_message(f"Targeting Reddit {reddit_target_type}: {target_input}")
-            args = (platform, target_input, reddit_target_type)
+            formatted_target = target_input
+
+            if reddit_target_type == "Kata Kunci Pencarian":
+                # Replace commas and spaces with '+' for a valid URL query
+                formatted_target = target_input.replace(',', ' ').replace(' ', '+')
+                # Consolidate multiple '+' into one
+                formatted_target = '+'.join(filter(None, formatted_target.split('+')))
+
+            self.log_message(f"Targeting Reddit {reddit_target_type}: {formatted_target}")
+            args = (platform, formatted_target, reddit_target_type)
 
         self.scraping_thread = threading.Thread(target=self.run_scraping_pipeline, args=args)
         self.scraping_thread.start()
