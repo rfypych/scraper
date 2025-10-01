@@ -54,12 +54,22 @@ async def scrape_x(keyword, start_date, end_date, username, password, max_tweets
             await page.wait_for_url("https://twitter.com/home", timeout=60000)
             logging.info("Login successful.")
 
+            # Add a short delay to mimic human behavior before searching
+            logging.info("Pausing for 3 seconds to mimic human behavior...")
+            await asyncio.sleep(3)
+
             # 2. Perform search
             search_query = f"{keyword} since:{start_date} until:{end_date}"
             logging.info(f"Performing search with query: '{search_query}'")
 
             search_url = f"https://twitter.com/search?q={search_query.replace(' ', '%20')}&src=typed_query&f=live"
             await page.goto(search_url)
+
+            # Add a smart wait to ensure the search results page is ready
+            logging.info("Waiting for search results to load...")
+            # This selector targets the main timeline container for search results
+            await page.wait_for_selector('section[role="region"]', timeout=30000)
+            logging.info("Search results page is ready.")
 
             # 3. Scroll and scrape data
             logging.info(f"Starting to scroll and scrape a maximum of {max_tweets} tweets...")
