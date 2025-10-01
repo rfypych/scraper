@@ -72,20 +72,25 @@ playwright install-deps
     ```
 
 2.  **Enter Parameters**
-    - Fill in the **Kata Kunci** (Keyword).
-    - Specify the **Tanggal Mulai** (Start Date) and **Tanggal Selesai** (End Date) in `YYYY-MM-DD` format.
+    - **Kata Kunci (Keyword):** Fill in the search keyword(s).
+      - **Single Keyword:** `prabowo`
+      - **Multiple Keywords:** To search for multiple keywords at once, separate them with a comma. The application will find tweets containing *any* of the keywords.
+        - *Example:* `ganjar, prabowo, anies`
+        - This will be automatically converted into the X/Twitter search query `(ganjar OR prabowo OR anies)`.
+    - **Tanggal Mulai & Selesai (Start & End Date):** Specify the date range in `YYYY-MM-DD` format.
 
 3.  **Start the Process**
     - Click the **"Mulai Scraping"** button.
 
 4.  **Log In**
-    - A pop-up window will appear. Enter your X/Twitter username and password.
+    - A pop-up window will appear. Enter your X/Twitter username and password and click "Login".
 
 5.  **Monitor and Wait**
-    - The application will start scraping and analyzing data. You can monitor the progress in the **Log Status** window.
+    - The application will start scraping and analyzing data. You can monitor the real-time progress in the **Log Status** window.
+    - You can click the **"Berhenti"** (Stop) button at any time to safely halt the scraping and proceed with analyzing the data collected so far.
 
 6.  **Export Results**
-    - Once the process is complete, the **"Ekspor Hasil"** button will become active. Click it to save the `.csv` data and all visualization images to the `output` directory.
+    - Once the process is complete, the **"Ekspor Hasil"** button will become active. Click it to save the final `.csv` data and all visualization images to the `output` directory.
 
 ---
 *This project is intended for educational and research purposes. Please be aware of the terms of service of the social media platforms you are scraping.*

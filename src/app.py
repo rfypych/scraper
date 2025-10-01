@@ -141,10 +141,26 @@ class SocialScraperApp(tk.Tk):
         self.after(100, self.process_log_queue)
 
     def start_scraping_thread(self):
-        keyword = self.keyword_entry.get().strip()
-        if not keyword:
+        keyword_input = self.keyword_entry.get().strip()
+        if not keyword_input:
             messagebox.showwarning("Input Diperlukan", "Kata kunci tidak boleh kosong.")
             return
+
+        # --- Multi-Keyword Logic ---
+        keywords = [k.strip() for k in keyword_input.split(',')]
+        keywords = [k for k in keywords if k]  # Remove empty strings
+
+        if not keywords:
+            messagebox.showwarning("Input Diperlukan", "Format kata kunci salah.")
+            return
+
+        if len(keywords) == 1:
+            formatted_keyword = keywords[0]
+        else:
+            # Format for X/Twitter search: (word1 OR word2 OR word3)
+            formatted_keyword = f"({' OR '.join(keywords)})"
+
+        self.log_message(f"Keywords processed. Search query will be: {formatted_keyword}")
 
         login_popup = LoginPopup(self)
         username, password = login_popup.username, login_popup.password
@@ -156,7 +172,7 @@ class SocialScraperApp(tk.Tk):
         self.update_ui_for_scraping_start()
         self.scraping_thread = threading.Thread(
             target=self.run_scraping_pipeline,
-            args=(keyword, self.start_date_entry.get(), self.end_date_entry.get(), username, password)
+            args=(formatted_keyword, self.start_date_entry.get(), self.end_date_entry.get(), username, password)
         )
         self.scraping_thread.start()
 
